@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/BurntSushi/toml"
+	"github.com/emicklei/hopwatch"
 	"github.com/theplant/blackfriday"
 	"html/template"
 	"io"
@@ -84,12 +85,18 @@ func (p Pages) Limit(n int) Pages { return p[0:n] }
 // TODO abstract further to support loading from more
 // than just files on disk. Should load reader (file, []byte)
 func NewPage(filename string) *Page {
+	if string(os.PathSeparator) == "\\" {
+		filename = strings.Replace(filename, "/", "\\", -1)
+	} else {
+		filename = strings.Replace(filename, "\\", "/", -1)
+	}
 	page := Page{contentType: "",
 		File:   File{FileName: filename, Extension: "html"},
-		Node:   Node{Keywords: make([]string, 10, 30)},
+		Node:   Node{Keywords: make([]string, 10, 30), Site: SiteInfo{Config: DefaultConfig()}},
 		Params: make(map[string]interface{}),
 		Markup: "md"}
 	page.Date, _ = time.Parse("20060102", "20080101")
+	hopwatch.Dump(page.Node).CallerOffset(5)
 	return &page
 }
 
@@ -110,12 +117,21 @@ func (p *Page) setUrlPath() error {
 	y := strings.TrimPrefix(p.FileName, p.Site.Config.GetAbsPath(p.Site.Config.ContentDir))
 	x := strings.Split(y, string(os.PathSeparator))
 
+	hopwatch.Dumpf("p.FileName '%s'", p.FileName)
+	hopwatch.Dumpf("p.Site.Config.ContentDir '%s'", p.Site.Config.ContentDir)
+	hopwatch.Dumpf("p.Site.Config.GetAbsPath(p.Site.Config.ContentDir)='%s'", p.Site.Config.GetAbsPath(p.Site.Config.ContentDir))
+	hopwatch.Dumpf("os.PathSeparator '%c'", os.PathSeparator)
+	hopwatch.Dumpf("x %v, y %v", x, y)
+
 	if len(x) <= 1 {
+		hopwatch.Break()
 		return errors.New("Zero length page name")
 	}
 
-	p.Section = strings.Trim(x[1], "/\\")
+	p.Section = strings.Trim(x[len(x)-2], "/\\")
 	p.Path = strings.Trim(strings.Join(x[:len(x)-1], string(os.PathSeparator)), "/\\")
+	hopwatch.Dumpf("p.Section %s", p.Section)
+	hopwatch.Dumpf("p.Path %s", p.Path)
 	return nil
 }
 
@@ -190,7 +206,7 @@ func ReadFrom(buf io.Reader, name string) (page *Page, err error) {
 		return
 	}
 
-	p.analyzePage()
+	p.Initalize()
 
 	return p, nil
 }
@@ -289,6 +305,7 @@ func (page *Page) update(f interface{}) error {
 			page.Url = Urlize(interfaceToString(v))
 		case "type":
 			page.contentType = interfaceToString(v)
+			hopwatch.Dumpf("v='%v'", v).Break()
 		case "keywords":
 			page.Keywords = interfaceArrayToStringArray(v)
 		case "date", "pubdate":

@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/BurntSushi/toml"
+	"github.com/emicklei/hopwatch"
 	"io/ioutil"
 	"launchpad.net/goyaml"
 	"os"
@@ -38,17 +39,41 @@ type Config struct {
 
 var c Config
 
-// Read cfgfile or setup defaults.
-func SetupConfig(cfgfile *string, path *string) *Config {
-	c.setPath(*path)
+func DefaultConfig() *Config {
+	c.setPath("")
+	c.ConfigFile = ""
+	setDefaults()
 
-	cfg, err := c.findConfigFile(*cfgfile)
+	setDefaultIndexesIfNoneProvided()
+	setBaseUrlSuffix()
+
+	return &c
+}
+
+// Read cfgfile or setup defaults.
+func SetupConfig(cfgfile string, path string) *Config {
+	hopwatch.Dump(path).Dump(c).Break()
+	c.setPath(path)
+
+	cfg, err := c.findConfigFile(cfgfile)
 	c.ConfigFile = cfg
 
 	if err != nil {
 		fmt.Printf("%v", err)
 		fmt.Println(" using defaults instead")
 	}
+
+	setDefaults()
+
+	c.readInConfig()
+
+	setDefaultIndexesIfNoneProvided()
+	setBaseUrlSuffix()
+
+	return &c
+}
+
+func setDefaults() {
 
 	// set defaults
 	c.ContentDir = "content"
@@ -59,21 +84,21 @@ func SetupConfig(cfgfile *string, path *string) *Config {
 	c.BuildDrafts = false
 	c.UglyUrls = false
 	c.Verbose = false
+}
 
-	c.readInConfig()
-
-	// set index defaults if none provided
+func setDefaultIndexesIfNoneProvided() {
 	if len(c.Indexes) == 0 {
 		c.Indexes = make(map[string]string)
 		c.Indexes["tag"] = "tags"
 		c.Indexes["category"] = "categories"
 	}
+}
 
+func setBaseUrlSuffix() {
 	if !strings.HasSuffix(c.BaseUrl, "/") {
 		c.BaseUrl = c.BaseUrl + "/"
 	}
 
-	return &c
 }
 
 func (c *Config) readInConfig() {
@@ -109,6 +134,11 @@ func (c *Config) setPath(p string) {
 		}
 		c.Path = path
 	} else {
+		if string(os.PathSeparator) == "\\" {
+			p = strings.Replace(p, "/", "\\", -1)
+		} else {
+			p = strings.Replace(p, "\\", "/", -1)
+		}
 		path, err := filepath.Abs(p)
 		if err != nil {
 			fmt.Printf("Error finding path: %s", err)

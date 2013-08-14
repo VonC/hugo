@@ -121,7 +121,7 @@ func checkPageLayout(t *testing.T, page *Page, layout string) {
 }
 
 func TestCreateNewPage(t *testing.T) {
-	p, err := ReadFrom(strings.NewReader(SIMPLE_PAGE), "simple")
+	p, err := ReadFrom(strings.NewReader(SIMPLE_PAGE), "page/simple")
 	if err != nil {
 		t.Fatalf("Unable to create a page with frontmatter and body content: %s", err)
 	}
@@ -141,7 +141,7 @@ func TestCreatePage(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		_, err := ReadFrom(test.r, "page")
+		_, err := ReadFrom(test.r, "pages/page")
 		if err != nil {
 			t.Errorf("Unable to parse page: %s", err)
 		}
